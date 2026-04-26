@@ -2,6 +2,27 @@ version: "3.8"
 
 services:
 
+  # ---------------- JENKINS ----------------
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    container_name: jenkins
+    restart: always
+    user: root
+    ports:
+      - "8085:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - //var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - swiftpay-network
+    command: >
+      bash -c "
+      apt-get update &&
+      apt-get install -y docker.io &&
+      /usr/bin/tini -- /usr/local/bin/jenkins.sh
+      "
+
   # ---------------- POSTGRES ----------------
   postgres:
     image: postgres:16
@@ -17,6 +38,18 @@ services:
       - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - swiftpay-network
+
+  # ---------------- REDIS ----------------
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
     networks:
       - swiftpay-network
 
@@ -46,18 +79,16 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - swiftpay-network
 
-  # ---------------- TOPIC INIT ----------------
+  # ---------------- KAFKA TOPIC INIT ----------------
   kafka-init:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka-init
@@ -78,66 +109,6 @@ services:
     networks:
       - swiftpay-network
 
-  # ---------------- REDIS ----------------
-  redis:
-    image: redis:7
-    container_name: redis
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - swiftpay-network
-
-  # ---------------- TRANSACTION GATEWAY ----------------
-  transaction-gateway:
-    image: mallikrishna/transaction-gateway:latest
-    container_name: transaction-gateway
-    restart: always
-    depends_on:
-      - postgres
-      - kafka
-      - redis
-      - ledger-service
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8081:8080"
-    networks:
-      - swiftpay-network
-
-  # ---------------- LEDGER SERVICE ----------------
-  ledger-service:
-    image: mallikrishna/ledger-service:latest
-    container_name: ledger-service
-    restart: always
-    depends_on:
-      - postgres
-      - kafka
-      - redis
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8082:8080"
-    networks:
-      - swiftpay-network
-
-  # ---------------- ANALYTICS WORKER ----------------
-  analytics-worker:
-    image: mallikrishna/analytics-worker:latest
-    container_name: analytics-worker
-    restart: always
-    depends_on:
-      - postgres
-      - kafka
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8083:8080"
-    networks:
-      - swiftpay-network
-
 # ---------------- NETWORK ----------------
 networks:
   swiftpay-network:
@@ -147,3 +118,4 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  jenkins_home:
