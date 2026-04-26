@@ -1,4 +1,4 @@
-package com.swiftpay.ledger_service.KafkaEventListener;
+package com.swiftpay.ledger_service.kafkaEventListener;
 
 import com.swiftpay.ledger_service.service.LedgerService;
 import lombok.RequiredArgsConstructor;
