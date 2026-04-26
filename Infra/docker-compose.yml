@@ -14,7 +14,7 @@ services:
       TZ: Asia/Kolkata
       PGTZ: Asia/Kolkata
     ports:
-      - "5433:5432"   # access from local machine
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -30,6 +30,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    networks:
+      - swiftpay-network
 
   # ---------------- KAFKA ----------------
   kafka:
@@ -52,10 +54,13 @@ services:
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - swiftpay-network
 
   # ---------------- TOPIC INIT ----------------
   kafka-init:
     image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka-init
     depends_on:
       - kafka
     entrypoint: ["/bin/sh", "-c"]
@@ -70,6 +75,8 @@ services:
 
       echo 'Kafka topics created';
       "
+    networks:
+      - swiftpay-network
 
   # ---------------- REDIS ----------------
   redis:
@@ -80,6 +87,54 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - swiftpay-network
+
+  # ---------------- TRANSACTION GATEWAY ----------------
+  transaction-gateway:
+    image: mallikrishna/transaction-gateway:latest
+    container_name: transaction-gateway
+    restart: always
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - ledger-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8081:8080"
+    networks:
+      - swiftpay-network
+
+  # ---------------- LEDGER SERVICE ----------------
+  ledger-service:
+    image: mallikrishna/ledger-service:latest
+    container_name: ledger-service
+    restart: always
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8082:8080"
+    networks:
+      - swiftpay-network
+
+  # ---------------- ANALYTICS WORKER ----------------
+  analytics-worker:
+    image: mallikrishna/analytics-worker:latest
+    container_name: analytics-worker
+    restart: always
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8083:8080"
     networks:
       - swiftpay-network
 

@@ -6,11 +6,14 @@ import com.swiftpay.transaction_gateway_service.model.PaymentInitiatedEvent;
 import com.swiftpay.transaction_gateway_service.model.PaymentRequest;
 import com.swiftpay.transaction_gateway_service.model.PaymentResponse;
 import com.swiftpay.transaction_gateway_service.repository.PaymentRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -20,6 +23,9 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
+
+    @Value("${ledger.service.base-url}")
+    private String ledgerBaseUrl;
 
     private final PaymentRepository paymentRepository;
     private final StringRedisTemplate redisTemplate;
@@ -107,10 +113,11 @@ public class PaymentService {
     // ==========================================
     private BigDecimal getSenderBalance(Long senderId) {
 
-        String url =
-                "http://localhost:8082/v1/transactions/accounts/"
-                        + senderId +
-                        "/balance";
+        String url = UriComponentsBuilder
+                .fromUriString(ledgerBaseUrl)
+                .path("/v1/transactions/accounts/{senderId}/balance")
+                .buildAndExpand(senderId)
+                .toUriString();
 
         try {
             return restTemplate.getForObject(url, BigDecimal.class);
@@ -122,23 +129,49 @@ public class PaymentService {
     }
 
 
+    @Transactional
     public void processCompleted(String message) {
-        PaymentResponse paymentResponse = objectMapper.readValue(message, PaymentResponse.class);
+        try {
+            PaymentResponse response =
+                    objectMapper.readValue(message, PaymentResponse.class);
 
-        PaymentTransaction paymentTransaction = paymentRepository.findByTransactionId(paymentResponse.getTransactionId());
+            PaymentTransaction payment =
+                    paymentRepository.findByTransactionId(response.getTransactionId());
 
-        paymentTransaction.setStatus(paymentResponse.getStatus());
-        paymentTransaction.setMessage(paymentResponse.getMessage());
-        paymentRepository.save(paymentTransaction);
+            if (payment == null) {
+                throw new IllegalArgumentException("Transaction not found");
+            }
+
+            payment.setStatus(response.getStatus());
+            payment.setMessage(response.getMessage());
+
+            paymentRepository.save(payment);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Retrying payment-completed event", e);
+        }
     }
 
+    @Transactional
     public void processFailed(String message) {
-        PaymentResponse paymentResponse = objectMapper.readValue(message, PaymentResponse.class);
+        try {
+            PaymentResponse response =
+                    objectMapper.readValue(message, PaymentResponse.class);
 
-        PaymentTransaction paymentTransaction = paymentRepository.findByTransactionId(paymentResponse.getTransactionId());
+            PaymentTransaction payment =
+                    paymentRepository.findByTransactionId(response.getTransactionId());
 
-        paymentTransaction.setMessage(paymentResponse.getMessage());
-        paymentTransaction.setStatus("FAILED");
-        paymentRepository.save(paymentTransaction);
+            if (payment == null) {
+                throw new IllegalArgumentException("Transaction not found");
+            }
+
+            payment.setStatus("FAILED");
+            payment.setMessage(response.getMessage());
+
+            paymentRepository.save(payment);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Retrying payment-failed event", e);
+        }
     }
 }
