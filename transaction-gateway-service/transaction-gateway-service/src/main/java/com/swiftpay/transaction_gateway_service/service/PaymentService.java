@@ -111,7 +111,7 @@ public class PaymentService {
     // Example:
     // GET http://localhost:8082/v1/accounts/{userId}/balance
     // ==========================================
-    private BigDecimal getSenderBalance(Long senderId) {
+    public BigDecimal getSenderBalance(Long senderId) {
 
         String url = UriComponentsBuilder
                 .fromUriString(ledgerBaseUrl)

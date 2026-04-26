@@ -1,4 +1,3 @@
-/*
 package com.swiftpay.transaction_gateway_service;
 
 import org.junit.jupiter.api.Test;
@@ -12,4 +11,4 @@ class TransactionGatewayServiceApplicationTests {
 	}
 
 }
-*/
+

@@ -28,6 +28,14 @@ public class PaymentController {
     public PaymentResponse createPayment(
             @Valid @RequestBody PaymentRequest request) {
 
-        return paymentService.processPayment(request);
+        try {
+            return paymentService.processPayment(request);
+        } catch (RuntimeException e) {
+            return new PaymentResponse(
+                    request.getTransactionId(),
+                    "FAILED",
+                    "Some thing went wrong"
+            );
+        }
     }
 }
