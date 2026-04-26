@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_DIR = 'transaction-gateway-service/transaction-gateway-service'
+        IMAGE = 'mallikrishna/transaction-gateway:latest'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Jar') {
+            steps {
+                dir("${APP_DIR}") {
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                dir("${APP_DIR}") {
+                    sh 'docker build -t ${IMAGE} .'
+                }
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    sh 'echo ${PASS} | docker login -u ${USER} --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                sh 'docker push ${IMAGE}'
+            }
+        }
+
+        stage('Deploy Local') {
+            steps {
+                sh '''
+                docker rm -f transaction-gateway || true
+                docker run -d --name transaction-gateway \
+                  --network infra_swiftpay-network \
+                  -e SPRING_PROFILES_ACTIVE=docker \
+                  -p 8081:8080 ${IMAGE}
+                '''
+            }
+        }
+    }
+}
