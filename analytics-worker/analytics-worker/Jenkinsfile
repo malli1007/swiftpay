@@ -23,7 +23,7 @@ pipeline {
             }
             steps {
                 dir("${APP_DIR}") {
-                    sh 'mvn clean package -DskipTests'
+                    sh 'mvn clean package'
                     stash includes: 'target/*.jar', name: 'jar-file'
                 }
             }
