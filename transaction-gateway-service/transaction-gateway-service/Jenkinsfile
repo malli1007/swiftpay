@@ -30,9 +30,11 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                dir("${APP_DIR}") {
-                    sh 'docker build -t ${IMAGE} .'
-                }
+                sh '''
+                docker build \
+                -t mallikrishna/transaction-gateway:latest \
+                transaction-gateway-service/transaction-gateway-service
+                '''
             }
         }
 
