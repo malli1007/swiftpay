@@ -14,6 +14,6 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("SwiftPay API")
                         .version("1.0")
-                        .description("Ledger Microservice APIs test"));
+                        .description("Ledger Microservice APIs"));
     }
 }
