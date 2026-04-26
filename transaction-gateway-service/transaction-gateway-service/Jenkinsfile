@@ -24,20 +24,21 @@ pipeline {
             steps {
                 dir("${APP_DIR}") {
                     sh 'mvn clean package -DskipTests'
+                    stash includes: 'target/*.jar', name: 'jar-file'
                 }
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh '''
-                cp transaction-gateway-service/transaction-gateway-service/target/Transaction-Gateway.jar \
-                   transaction-gateway-service/transaction-gateway-service/app.jar
-
-                DOCKER_BUILDKIT=0 docker build \
-                -t mallikrishna/transaction-gateway:latest \
-                transaction-gateway-service/transaction-gateway-service
-                '''
+                dir("${APP_DIR}") {
+                    unstash 'jar-file'
+                    sh 'cp target/*.jar app.jar'
+                    sh '''
+                    DOCKER_BUILDKIT=0 docker build \
+                    -t ${IMAGE} .
+                    '''
+                }
             }
         }
 
