@@ -130,6 +130,9 @@
 				</executions>
 			</plugin>
 		</plugins>
+		<finalName>
+			Analytics-Worker
+		</finalName>
 	</build>
 
 </project>
