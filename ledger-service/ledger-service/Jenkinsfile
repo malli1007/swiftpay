@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_DIR = 'ledger-service/ledger-service'
+        IMAGE = 'mallikrishna/transaction-gateway:latest'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Jar') {
+            agent {
+                docker {
+                    image 'maven:3.9.9-eclipse-temurin-21'
+                    args '-v $HOME/.m2:/root/.m2'
+                }
+            }
+            steps {
+                dir("${APP_DIR}") {
+                    sh 'mvn clean package -DskipTests'
+                    stash includes: 'target/*.jar', name: 'jar-file'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                dir("${APP_DIR}") {
+                    unstash 'jar-file'
+                    sh 'cp target/*.jar app.jar'
+                    sh '''
+                    DOCKER_BUILDKIT=0 docker build \
+                    -t ${IMAGE} .
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    sh 'echo ${PASS} | docker login -u ${USER} --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                sh 'docker push ${IMAGE}'
+            }
+        }
+
+        stage('Deploy Local') {
+            steps {
+                sh '''
+                docker rm -f ledger-service || true
+                docker run -d --name ledger-service \
+                  --network infra_swiftpay-network \
+                  -e SPRING_PROFILES_ACTIVE=docker \
+                  -p 8082:8080 ${IMAGE}
+                '''
+            }
+        }
+    }
+}

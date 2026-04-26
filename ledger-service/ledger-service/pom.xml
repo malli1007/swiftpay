@@ -144,6 +144,10 @@
 				</executions>
 			</plugin>
 		</plugins>
+
+		<finalName>
+			Ledger-Service
+		</finalName>
 	</build>
 
 </project>
