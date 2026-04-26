@@ -31,6 +31,9 @@ pipeline {
         stage('Docker Build') {
             steps {
                 sh '''
+                cp transaction-gateway-service/transaction-gateway-service/target/Transaction-Gateway.jar \
+                   transaction-gateway-service/transaction-gateway-service/app.jar
+
                 DOCKER_BUILDKIT=0 docker build \
                 -t mallikrishna/transaction-gateway:latest \
                 transaction-gateway-service/transaction-gateway-service
